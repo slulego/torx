@@ -40,6 +40,6 @@ This example creates a square with 5 stripes.
 
 ## Usage
 
-```
-torx file.torx out/file.html
+```shell
+torx source-folder distribution-folder [options]
 ```

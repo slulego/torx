@@ -1,3 +1,9 @@
+# 2.0.0 (2023-10-07)
+
+-  Command line interface overhaul.
+-  Add `--watch` option.
+-  Add `--dry-run` option.
+
 # 1.2.1
 
 -  Fix include bug.

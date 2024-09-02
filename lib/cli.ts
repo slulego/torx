@@ -5,55 +5,86 @@
 import * as fs from "fs";
 import * as torx from ".";
 import { performance } from "perf_hooks";
+import path = require("path");
 
-/**
- * Examples:
- * torx [options]
- * torx [path] - Symantic (name.ext.torx)
- * torx [path] [ext] - Extension (name.torx ext)
- * torx [path] [out] - Explicit (name.torx name.ext)
- */
+const commandLine = require.main === module;
 
-const isCLI = require.main === module;
+const configuration = {
+   sourceFile: undefined,
+   sourceFolder: undefined,
+   distributionFolder: undefined,
+   watch: false,
+   dryRun: false,
+};
 
-if (isCLI) {
+const options = [
+   {
+      command: ["-v", "--version"],
+      description: "Print torx version",
+      action: () => printVersion(),
+   },
+   {
+      command: ["-h", "--help"],
+      description: "Print command line options",
+      action: () => printHelp(),
+   },
+   {
+      command: ["-w", "--watch"],
+      description: "Watch for changes",
+      action: () => (configuration.watch = true),
+   },
+   {
+      command: ["-d", "--dry-run"],
+      description: "Dry run",
+      action: () => (configuration.dryRun = true),
+   },
+];
+
+if (commandLine) {
    const args = process.argv.slice(2);
+   const error = undefined;
 
-   if (args[0]) {
-      switch (args[0]) {
-         case "-v":
-         case "--version":
-            console.log("torx@" + require("../package.json").version);
+   for (const arg of args) {
+      const option = options.find(option => option.command.includes(arg));
+
+      if (option) {
+         option.action();
+      } else {
+         if (arg.startsWith("-")) {
+            error = `Unknown option '${arg}'`;
             break;
-         case "-h":
-         case "--help":
-            console.log("\nUsage: torx [options] [path] [ext]");
-            console.log("\nOptions: ");
-            console.log("  -v, --version   print torx version");
-            console.log("  -h, --help      command line options\n");
-            break;
-         default:
-            const startTime = performance.now();
-            let out;
-            try {
-               out = getOutPath(args[0], args[1]);
-            } catch (error) {
-               console.log("ERROR:", error);
+         } else if (!configuration.sourceFolder) {
+            if (arg.endsWith(".torx")) {
+               configuration.sourceFile = arg;
+               configuration.sourceFolder = "";
+            } else {
+               configuration.sourceFolder = arg;
             }
-            if (out) {
-               createFile(args[0], out)
-                  .then(outPath => {
-                     const endTime = performance.now();
-                     const buildTime = (endTime - startTime).toFixed();
-                     console.log(`BUILD: ${outPath} (${buildTime} ms)`);
-                  })
-                  .catch(error => console.log(error));
-            }
-            break;
+         } else if (!configuration.distributionFolder) {
+            configuration.distributionFolder = arg;
+         }
       }
-   } else {
-      console.log("ERROR: At least source file or argument is required.");
    }
+
+   if (error) {
+      console.log(error);
+      process.exit(1);
+   }
+
+   if (!configuration.sourceFile) {
+      console.log("ERROR: At least source file or argument is required.");
+      process.exit(1);
+   }
+
+   const startTime = performance.now();
+
+   createFile(configuration.sourceFile, configuration.distributionFolder)
+      .then(outPath => {
+         const endTime = performance.now();
+         const buildTime = (endTime - startTime).toFixed();
+         console.log(`BUILD: ${outPath} (${buildTime} ms)`);
+      })
+      .catch(error => console.log(error));
 }
 
 /**
@@ -88,38 +119,33 @@ function createFile(sourcePath: string, outPath: string): Promise<string> {
    });
 }
 
-/**
- * Generate the out path based on two arguments
- * @param arg1 - file path ending in ".torx"
- * @param arg2 - out file path or file extension
- */
-export function getOutPath(arg1: string, arg2?: string): string {
-   let fileName = arg1.split(".");
-   if (!arg2) {
-      if (fileName.length >= 3) {
-         // Symantic (file.extension.torx)
-         if (fileName[fileName.length - 1] === "torx") {
-            fileName.pop();
-            return fileName.join(".");
-         } else {
-            throw "A symantic file name must end in '.torx'";
-         }
-      } else {
-         throw "A symantic file name or an out path is required";
-      }
-   } else {
-      if (arg2.indexOf(".") >= 0) {
-         // Explicit (file.torx file.extension)
-         return arg2;
-      } else {
-         // Extension (file.torx extension)
-         if (fileName[fileName.length - 1] === "torx") {
-            fileName.pop();
-            fileName.push(arg2);
-            return fileName.join(".");
-         } else {
-            throw "When providing an extension name, the source file must end in '.torx'";
+/** Print the package version number */
+function printVersion() {
+   const packageJson = require("../package.json");
+
+   console.log(`${packageJson.name}@${packageJson.version}`);
+}
+
+function printHelp() {
+   console.log("\nOptions: ");
+   options.forEach(option => {
+      console.log(`  ${option.command.join(", ")}  ${option.description}`);
+   });
+}
+
+function watch(folder: string) {
+   fs.watch(folder, (eventType, filename) => {
+      if (filename && path.extname(filename) === ".torx") {
+         const fullPath = path.join(folder, filename);
+         if (eventType === "rename") {
+            if (fs.existsSync(fullPath)) {
+               console.log(`File ${fullPath} has been added`);
+            } else {
+               console.log(`File ${fullPath} has been removed`);
+            }
+         } else if (eventType === "change") {
+            console.log(`File ${fullPath} has been changed`);
          }
       }
-   }
+   });
 }

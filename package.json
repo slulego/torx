@@ -1,13 +1,13 @@
 {
    "name": "torx",
-   "version": "1.2.1",
-   "description": "TypeScript template engine for Node.",
+   "version": "2.0.0",
+   "description": "The TypeScript template engine for Node.",
    "license": "MIT",
    "author": {
       "name": "Stephen Ullom",
       "url": "http://stephenullom.com"
    },
-   "homepage": "https://github.com/torxjs/torx/wiki",
+   "homepage": "http://torxjs.com/",
    "repository": {
       "type": "git",
       "url": "git+https://github.com/torxjs/torx.git"
@@ -41,7 +41,8 @@
    "prettier": {
       "tabWidth": 3,
       "printWidth": 120,
-      "arrowParens": "avoid"
+      "arrowParens": "avoid",
+      "trailingComma": "all"
    },
    "eslintConfig": {
       "extends": [
@@ -49,7 +50,7 @@
       ],
       "parser": "@typescript-eslint/parser",
       "rules": {
-         "no-extra-parens": "warn"
+         "no-extra-parens": "off"
       }
    },
    "jest": {
