@@ -75,8 +75,6 @@ if (commandLine) {
       }
    }
 
-   console.log({ configuration });
-
    if (!configuration.sourceFolder) {
       exitError("The source file or folder must be provided.");
    }
@@ -86,6 +84,8 @@ if (commandLine) {
 
 async function compile(configuration: Configuration) {
    if (configuration.watch) {
+      console.log(`Watching for changes in ${configuration.sourceFolder}...`);
+
       // Watch for changes
       const watcher = fs.watch(configuration.sourceFolder);
 
@@ -109,43 +109,53 @@ async function compile(configuration: Configuration) {
          }
       }
    } else {
-      if (configuration.sourceFile) {
-         const startTime = performance.now();
+      const startTime = performance.now();
 
+      if (configuration.sourceFile) {
          // Single file
-         await compileFile(configuration.sourceFile, configuration.distributionFolder);
+         const compiled = await compileFile(configuration.sourceFile, configuration.distributionFolder);
 
          const endTime = performance.now();
          const buildTime = (endTime - startTime).toFixed();
 
-         console.log(`BUILD: ${buildTime} ms`);
+         console.log(`BUILD: ${compiled} ${buildTime} ms`);
       } else {
-         // File folder
+         // All files in folder
+         const torxFiles = await findTorxFiles(configuration.sourceFolder);
+
+         try {
+            await Promise.all(
+               torxFiles.map(async file => {
+                  const outPath = path.join(configuration.distributionFolder, path.basename(file, ".torx"));
+
+                  const compiled = await compileFile(file, outPath);
+                  console.log(`BUILD: ${compiled}`);
+               }),
+            );
+
+            const endTime = performance.now();
+            const buildTime = (endTime - startTime).toFixed();
+
+            console.log(`\nBUILD TIME: ${buildTime} ms`);
+         } catch (error) {
+            exitError(error);
+         }
       }
    }
-
-   // const torxFiles = await findTorxFiles(configuration.sourceFolder);
-
-   // try {
-   //    await Promise.all(torxFiles.map(file => compileFile(file, configuration.distributionFolder)));
-
-   //    const endTime = performance.now();
-   //    const buildTime = (endTime - startTime).toFixed();
-
-   //    console.log(`BUILD: ${buildTime} ms`);
-   // } catch (error) {
-   //    exitError(error.message);
-   // }
 }
 
-async function findTorxFiles(dir: string): Promise<string[]> {
+/**
+ * Find all Torx files in a directory
+ * @param directory - the directory to search
+ */
+async function findTorxFiles(directory: string): Promise<string[]> {
    let torxFiles: string[] = [];
 
-   const files = await fs.readdir(dir);
+   const files = await fs.readdir(directory);
 
    await Promise.all(
       files.map(async file => {
-         const fullPath = path.join(dir, file);
+         const fullPath = path.join(directory, file);
          const stat = await fs.stat(fullPath);
 
          if (stat.isDirectory()) {
